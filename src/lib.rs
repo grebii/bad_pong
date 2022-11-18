@@ -34,7 +34,7 @@ struct Ball {
     visible: bool,
 }
 impl Ball {
-    fn moove(&mut self, delta_time: f32, players: &mut [Player; 2], camera_shake: &mut CameraShake) {
+    fn moove(&mut self, delta_time: f32, players: &mut [Player; 2], camera_shake: &mut CameraShake, canvas_clear: &mut bool) {
 
         if !self.visible { return; }
 
@@ -60,7 +60,7 @@ impl Ball {
 
             camera_shake.pos.y -= 2.0;
         }
-        
+
         // TODO: simplify this to one function
         // check collission with player 1 paddle
         let collision = players[0].paddle.rect.collide(&self.rect);
@@ -90,7 +90,7 @@ impl Ball {
 
             camera_shake.pos.x += 2.0;
         }
-        
+
 
         // check if player one should score
         if self.rect.position.x > (WIDTH - PADDLE_PADDING) as f32 {
@@ -104,6 +104,8 @@ impl Ball {
             players[0].score();
 
             camera_shake.pos.x += 20.0;
+
+            *canvas_clear = true;
         }
 
         // check if player two should score
@@ -118,6 +120,8 @@ impl Ball {
             players[1].score();
 
             camera_shake.pos.x -= 20.0;
+
+            *canvas_clear = true;
         }
 
         // TODO: repeat less code please
@@ -160,6 +164,7 @@ pub struct PongGame {
     last_frame: Instant,
     frame_delay: f32,
     camera_shake: CameraShake,
+    clear_canvas: bool,
 }
 
 impl Default for PongGame {
@@ -197,8 +202,9 @@ impl PongGame {
             last_update: Instant::now(),
             delta_time: 0.0,
             last_frame: Instant::now(),
-            frame_delay: 0.0,
+            frame_delay: 0.02,
             camera_shake: CameraShake::default(),
+            clear_canvas: true,
         }
     }
 
@@ -214,7 +220,7 @@ impl PongGame {
         self.players[1].handle_input(input, self.delta_time);
 
         // move ball
-        self.ball.moove(self.delta_time, &mut self.players, &mut self.camera_shake);
+        self.ball.moove(self.delta_time, &mut self.players, &mut self.camera_shake, &mut self.clear_canvas);
 
         // score timer
         self.players[0].score_visibility_timer();
@@ -238,19 +244,28 @@ impl PongGame {
             return;
         }
 
-        let clear_rate = vec3(frame_delta * 10.0, frame_delta * 30.0, frame_delta * 20.0);
+        // clear the canvas
+        if self.clear_canvas {
+            for cell in pixels.get_frame_mut().array_chunks_mut() {
+                *cell =  [(cell[0] as f32 * 0.05) as u8, (cell[1] as f32 * 0.2) as u8, (cell[2] as f32 * 0.1) as u8, 0];
+            }
+            self.clear_canvas = false;
+        }
 
         for (i, cell) in pixels.get_frame_mut().array_chunks_mut().enumerate() {
             let x = (i as f32 % width) + self.camera_shake.pos.x;
             let y = (i as f32 / width) + self.camera_shake.pos.y;
             let _uv = vec2(x / width, y / height);
 
-            // create the ghost effect
             let mut col = vec3(
                 cell[0] as f32 / 255.0,
                 cell[1] as f32 / 255.0,
                 cell[2] as f32 / 255.0,
-            ) - clear_rate;
+            );
+
+            // fancy ghost effect
+            col -= vec3(col.x.powf(6.0), col.y.powf(2.5), col.y.powf(4.0)) * vec3(0.1, 0.8, 0.7);
+            // col -= vec3(col.x.powf(2.0), col.y.powf(2.0), col.y.powf(2.0)) * vec3(0.1, 0.8, 0.7);
 
             // draw player 1 paddle
             if let Some(c) = self.players[0].paddle.draw(vec2(x, y)) {

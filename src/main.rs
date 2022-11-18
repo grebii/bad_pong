@@ -6,7 +6,7 @@ use pixels::{SurfaceTexture, Pixels};
 use winit::{event_loop::EventLoop, window::WindowBuilder, dpi::{LogicalSize, LogicalPosition}, event::{Event, WindowEvent}};
 use winit_input_helper::WinitInputHelper;
 
-use pixels_test::*;
+use bad_pong::*;
 
 
 
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>>{
 
     // make the window
     let window = WindowBuilder::new()
-            .with_title("title")
+            .with_title("pongerino")
             .with_inner_size(LogicalSize::new(WIDTH * V_SCALE, HEIGHT * V_SCALE))
             .with_resizable(false)
             .build(&event_loop)?;
