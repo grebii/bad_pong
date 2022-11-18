@@ -40,6 +40,7 @@ impl Ball {
 
         // store magniture and direction of velocity for the future
         let magn = self.velocity.length();
+        let dir = self.velocity / magn;
 
         // move the ball along velocity
         self.rect.position += self.velocity * delta_time;
@@ -51,14 +52,15 @@ impl Ball {
             // also mirror velocity on the axis
             self.velocity.y *= -1.0;
 
-            camera_shake.pos.y += 2.0;
+            camera_shake.pos.y += 1.0 + (magn * 0.01);
+
         } else if self.rect.position.y < 0.0 {
             // snap it back if we do
             self.rect.position.y = 0.0;
             // also mirror velocity on the axis
             self.velocity.y *= -1.0;
 
-            camera_shake.pos.y -= 2.0;
+            camera_shake.pos.y -= 1.0 + (magn * 0.01);
         }
 
         // TODO: simplify this to one function
@@ -74,7 +76,7 @@ impl Ball {
 
             self.velocity = self.velocity.normalize() * (magn + BALL_SPEED_INCREASE);
 
-            camera_shake.pos.x -= 2.0;
+            camera_shake.pos.x -= 1.0 + (magn * 0.01);
         }
         // check collision with player 2 paddle
         let collision = players[1].paddle.rect.collide(&self.rect);
@@ -88,7 +90,7 @@ impl Ball {
 
             self.velocity = self.velocity.normalize() * (magn + BALL_SPEED_INCREASE);
 
-            camera_shake.pos.x += 2.0;
+            camera_shake.pos.x += 1.0 + (magn * 0.01);
         }
 
 
@@ -103,7 +105,7 @@ impl Ball {
 
             players[0].score();
 
-            camera_shake.pos.x += 20.0;
+            camera_shake.pos += self.velocity * 0.1;
 
             *canvas_clear = true;
         }
@@ -119,7 +121,8 @@ impl Ball {
 
             players[1].score();
 
-            camera_shake.pos.x -= 20.0;
+            // camera_shake.pos.x += 10.0;
+            camera_shake.pos += self.velocity * 0.1;
 
             *canvas_clear = true;
         }
@@ -228,9 +231,6 @@ impl PongGame {
 
         // respawn ball timer
         self.ball.respawn_timer();
-
-        // camera shake update
-        self.camera_shake.update(self.delta_time);
     }
 
     pub fn view(&mut self, pixels: &mut Pixels, width: f32, height: f32) {
@@ -253,8 +253,8 @@ impl PongGame {
         }
 
         for (i, cell) in pixels.get_frame_mut().array_chunks_mut().enumerate() {
-            let x = (i as f32 % width) + self.camera_shake.pos.x;
-            let y = (i as f32 / width) + self.camera_shake.pos.y;
+            let x = (i as f32 % width) + self.camera_shake.pos.x.round();
+            let y = (i as f32 / width) + self.camera_shake.pos.y.round();
             let _uv = vec2(x / width, y / height);
 
             let mut col = vec3(
@@ -302,5 +302,8 @@ impl PongGame {
                 255,
             ]
         }
+        // update camera shake after drawing the frame
+        // this looks nicer 
+        self.camera_shake.update(frame_delta);
     }
 }
