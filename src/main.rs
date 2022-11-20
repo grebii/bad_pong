@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn Error>>{
 
     // make the window
     let window = WindowBuilder::new()
+            .with_visible(false)
             .with_title("pongerino")
             .with_inner_size(LogicalSize::new(WIDTH * V_SCALE, HEIGHT * V_SCALE))
             .with_resizable(false)
@@ -29,7 +30,9 @@ fn main() -> Result<(), Box<dyn Error>>{
         Pixels::new(WIDTH, HEIGHT, surface_texture)?
     };
 
-    // initialize the game
+    window.set_visible(true);
+
+    // create the game
     let mut game = PongGame::new();
 
     // event loop
