@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 #![feature(array_chunks)]
 
 use std::error::Error;

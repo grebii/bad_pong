@@ -8,11 +8,14 @@ use rand::{thread_rng, Rng};
 use std::time::{Duration, Instant};
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
+use kira::manager::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackend};
+use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
 
 mod collision;
 mod draw;
 mod player;
 mod score;
+mod pong;
 
 use collision::{Rect, Side};
 use draw::Draw;
@@ -34,7 +37,7 @@ struct Ball {
     visible: bool,
 }
 impl Ball {
-    fn moove(&mut self, delta_time: f32, players: &mut [Player; 2], camera_shake: &mut CameraShake, canvas_clear: &mut bool) {
+    fn moove(&mut self, delta_time: f32, players: &mut [Player; 2], camera_shake: &mut CameraShake, canvas_clear: &mut bool, sounds: &mut Sounds) {
 
         if !self.visible { return; }
 
@@ -53,6 +56,7 @@ impl Ball {
             self.velocity.y *= -1.0;
 
             camera_shake.pos.y += 1.0 + (magn * 0.01);
+            sounds.play(0);
 
         } else if self.rect.position.y < 0.0 {
             // snap it back if we do
@@ -61,6 +65,7 @@ impl Ball {
             self.velocity.y *= -1.0;
 
             camera_shake.pos.y -= 1.0 + (magn * 0.01);
+            sounds.play(0);
         }
 
         // TODO: simplify this to one function
@@ -77,6 +82,7 @@ impl Ball {
             self.velocity = self.velocity.normalize() * (magn + BALL_SPEED_INCREASE);
 
             camera_shake.pos.x -= 1.0 + (magn * 0.01);
+            sounds.play(0);
         }
         // check collision with player 2 paddle
         let collision = players[1].paddle.rect.collide(&self.rect);
@@ -91,8 +97,11 @@ impl Ball {
             self.velocity = self.velocity.normalize() * (magn + BALL_SPEED_INCREASE);
 
             camera_shake.pos.x += 1.0 + (magn * 0.01);
+            sounds.play(0);
         }
 
+        let mut rng = thread_rng();
+        let random_dir = vec2(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)).normalize();
 
         // check if player one should score
         if self.rect.position.x > (WIDTH - PADDLE_PADDING) as f32 {
@@ -105,7 +114,8 @@ impl Ball {
 
             players[0].score();
 
-            camera_shake.pos += self.velocity * 0.1;
+            camera_shake.pos += random_dir * self.velocity.length() * 0.1;
+            sounds.play(1);
 
             *canvas_clear = true;
         }
@@ -122,7 +132,8 @@ impl Ball {
             players[1].score();
 
             // camera_shake.pos.x += 10.0;
-            camera_shake.pos += self.velocity * 0.1;
+            camera_shake.pos += random_dir * self.velocity.length() * 0.1;
+            sounds.play(1);
 
             *canvas_clear = true;
         }
@@ -168,6 +179,18 @@ pub struct PongGame {
     frame_delay: f32,
     camera_shake: CameraShake,
     clear_canvas: bool,
+    sounds: Sounds,
+}
+
+pub struct Sounds {
+    manager: AudioManager,
+    sounds: [StaticSoundData; 2],
+}
+
+impl Sounds {
+    fn play(&mut self, index: usize) {
+        self.manager.play(self.sounds[index].clone());
+    }
 }
 
 impl Default for PongGame {
@@ -177,22 +200,27 @@ impl Default for PongGame {
 }
 impl PongGame {
     pub fn new() -> Self {
+        let manager =  AudioManager::<CpalBackend>::new(AudioManagerSettings::default()).unwrap();
+        let hit = StaticSoundData::from_file("./sfx/hit.wav", StaticSoundSettings::default()).unwrap();
+        let goal = StaticSoundData::from_file("./sfx/lose4.wav", StaticSoundSettings::default()).unwrap();
+
         Self {
             players: [
                 Player::new(
                     Paddle::new(Rect::at_side(vec2(PADDLE_PADDING as f32, HEIGHT as f32 * 0.5), uvec2(2, 9), Side::Left)),
                     Controller::Keyboard {
-                        up: VirtualKeyCode::W,
-                        down: VirtualKeyCode::S,
+                        up: VirtualKeyCode::Up,
+                        down: VirtualKeyCode::Down,
                     },
                     Score::new(0, 2, uvec2(SCORE_PADDING, 2))
                 ),
                 Player::new(
                     Paddle::new(Rect::at_side(vec2((WIDTH - PADDLE_PADDING) as f32, HEIGHT as f32 * 0.5), uvec2(2, 9), Side::Right)),
-                    Controller::Keyboard {
-                        up: VirtualKeyCode::Up,
-                        down: VirtualKeyCode::Down,
-                    },
+                    // Controller::Keyboard {
+                    //     up: VirtualKeyCode::Up,
+                    //     down: VirtualKeyCode::Down,
+                    // },
+                    Controller::Computer,
                     Score::new(0, 2, uvec2(WIDTH - SCORE_PADDING - 6, 2))
                 ),
             ],
@@ -208,22 +236,25 @@ impl PongGame {
             frame_delay: 0.02,
             camera_shake: CameraShake::default(),
             clear_canvas: true,
+            sounds: Sounds { manager, sounds: [hit, goal] }
         }
     }
 
     // ---------------------------------
     // INPUT UPDATE DAIUWHD
+    // TODO: replace some thing with input func
+    pub fn input(&mut self, input: &WinitInputHelper) {}
 
     pub fn update(&mut self, input: &WinitInputHelper) {
         self.delta_time = self.last_update.elapsed().as_secs_f32();
         self.last_update = Instant::now();
 
         // input
-        self.players[0].handle_input(input, self.delta_time);
-        self.players[1].handle_input(input, self.delta_time);
+        self.players[0].handle_input(input, &self.ball,  self.players[1].score.score, self.delta_time);
+        self.players[1].handle_input(input, &self.ball, self.players[0].score.score, self.delta_time);
 
         // move ball
-        self.ball.moove(self.delta_time, &mut self.players, &mut self.camera_shake, &mut self.clear_canvas);
+        self.ball.moove(self.delta_time, &mut self.players, &mut self.camera_shake, &mut self.clear_canvas, &mut self.sounds);
 
         // score timer
         self.players[0].score_visibility_timer();

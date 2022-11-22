@@ -1,8 +1,9 @@
 use glam::vec2;
+use map_range::MapRange;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
-use crate::{score::Score, collision::{Rect, Side}, PongGame, HEIGHT};
+use crate::{score::Score, collision::{Rect, Side}, PongGame, HEIGHT, Ball, WIDTH};
 
 pub enum Controller {
     Keyboard { up: VirtualKeyCode, down: VirtualKeyCode },
@@ -23,21 +24,32 @@ impl Player {
             controller
         } 
     }
-    pub fn handle_input(&mut self, input: &WinitInputHelper, dt: f32) {
+    pub fn handle_input(&mut self, input: &WinitInputHelper, ball: &Ball, other_score: u32, dt: f32) {
         let mut vel = 0.0;
-        if let Controller::Keyboard { up, down } = self.controller {
-            if input.key_held(up) {
-                vel -= dt;
+
+        match self.controller {
+            Controller::Keyboard { up, down } => {
+                if input.key_held(up) {
+                    vel -= dt;
+                }
+                if input.key_held(down) {
+                    vel += dt;
+                }
+                
+                // move paddle dida and snap to grid if there's no input
+                if vel != 0.0 {
+                    self.paddle.moove(vel);
+                } else {
+                    self.paddle.rect.position.floor();
+                }
             }
-            if input.key_held(down) {
-                vel += dt;
-            }
-            
-            // move paddle dida and snap to grid if there's no input
-            if vel != 0.0 {
-                self.paddle.moove(vel);
-            } else {
-                self.paddle.rect.position.floor();
+            Controller::Computer => {
+                let offset = ball.rect.position.y - self.paddle.rect.position.y;
+                let distance = (ball.rect.position.x - self.paddle.rect.position.x).map_range(0.0..WIDTH as f32, 0.0..0.5);
+                let speed = ball.velocity.y * distance;
+                let score = (other_score as f32).map_range(0.0..10.0, 0.5..1.0).min(1.0);
+                let x = (offset + speed).signum() * score;
+                self.paddle.moove(x * dt);
             }
         }
     }
