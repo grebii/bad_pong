@@ -5,6 +5,7 @@
 use glam::{uvec2, vec2, vec3, UVec2, Vec2, Vec3};
 use pixels::{Pixels, SurfaceTexture};
 use rand::{thread_rng, Rng};
+use std::io::Cursor;
 use std::time::{Duration, Instant};
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
@@ -29,6 +30,7 @@ const PADDLE_PADDING: u32 = 8;
 const SCORE_PADDING: u32 = 20;
 const BALL_SPEED: f32 = 60.0;
 const BALL_SPEED_INCREASE: f32 = 5.0;
+
 
 struct Ball {
     rect: Rect,
@@ -200,9 +202,13 @@ impl Default for PongGame {
 }
 impl PongGame {
     pub fn new() -> Self {
+        let hit_file = include_bytes!("../sfx/hit.wav");
+        let goal_file = include_bytes!("../sfx/lose4.wav");
+        
         let manager =  AudioManager::<CpalBackend>::new(AudioManagerSettings::default()).unwrap();
-        let hit = StaticSoundData::from_file("./sfx/hit.wav", StaticSoundSettings::default()).unwrap();
-        let goal = StaticSoundData::from_file("./sfx/lose4.wav", StaticSoundSettings::default()).unwrap();
+        // let hit = StaticSoundData::from_file("./sfx/hit.wav", StaticSoundSettings::default()).unwrap();
+        let hit = StaticSoundData::from_cursor(Cursor::new(hit_file), StaticSoundSettings::default()).unwrap();
+        let goal = StaticSoundData::from_cursor(Cursor::new(goal_file), StaticSoundSettings::default()).unwrap();
 
         Self {
             players: [

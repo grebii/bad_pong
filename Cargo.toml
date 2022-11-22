@@ -13,3 +13,12 @@ pixels = "0.10.0"
 rand = "0.8.5"
 winit = "0.27.5"
 winit_input_helper = "0.13.0"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"
+
+# cargo +nightly build -Z build-std=std,panic_abort --target x86_64-pc-windows-msvc --release
